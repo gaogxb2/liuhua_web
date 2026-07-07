@@ -1,0 +1,62 @@
+1
+
+display device
+13
+1
+2
+74 D1SCAC
+75 D1SCAB
+</Message>
+
+
+display elabel brief
+FFFF
+MPU74 HZMBL03 C33C44DE3F3 3G223
+MPU75 HZMBL03 C33C44DE3F3 3G223
+</Message>
+
+
+display clock | no-more
+2025-02-10
+</Message>
+
+
+display board-reset all
+
+Board 74 reset information:
+-- 1. DATE:2025-07-03 TIME:123111
+----------------------------------
+
+</Message>
+
+
+ 74 module cpu_serdes_info
+
+macro3,ds3
+DSDFCNEIU123
+FFJ,32R2,3`,1E2E
+DS_TX:0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x20,0x1111,0x1111,0x1111,
+
+
+macro4,ds4
+DSDFCNEIU123
+FFJ,32R2,3`,1E2E
+DS_TX:0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x20,0x1111,0x1111,0x1111,
+
+</Message>
+
+serdes slot 74 
+macro 0 lane 0: code-up:0x0;
+</Message>
+
+display temperature | no-more
+Base-Board, Unit:C, Slot 74
+----------------------------------
+42
+----------------------------------
+-
+</Message>
+
+display startup | no-more
+software R23
+</Message>

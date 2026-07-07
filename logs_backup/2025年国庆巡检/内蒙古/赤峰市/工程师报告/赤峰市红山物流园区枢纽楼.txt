@@ -1,0 +1,62 @@
+1
+
+display device
+13
+1
+2
+56 D1SCAC
+57 D1SCAB
+</Message>
+
+
+display elabel brief
+FFFF
+MPU56 GGLJXL8 L98L89IK8L8 8L998
+MPU57 GGLJXL8 L98L89IK8L8 8L998
+</Message>
+
+
+display clock | no-more
+2025-10-01
+</Message>
+
+
+display board-reset all
+
+Board 56 reset information:
+-- 1. DATE:2025-06-10 TIME:123111
+----------------------------------
+
+</Message>
+
+
+ 56 module cpu_serdes_info
+
+macro3,ds3
+DSDFCNEIU123
+FFJ,32R2,3`,1E2E
+DS_TX:0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1,0x1111,0x1111,0x1111,
+
+
+macro4,ds4
+DSDFCNEIU123
+FFJ,32R2,3`,1E2E
+DS_TX:0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1,0x1111,0x1111,0x1111,
+
+</Message>
+
+serdes slot 56 
+macro 0 lane 0: code-up:0x0;
+</Message>
+
+display temperature | no-more
+Base-Board, Unit:C, Slot 56
+----------------------------------
+48
+----------------------------------
+-
+</Message>
+
+display startup | no-more
+software R23
+</Message>

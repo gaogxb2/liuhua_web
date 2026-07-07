@@ -1,0 +1,62 @@
+1
+
+display device
+13
+1
+2
+70 D1SCAC
+71 D1SCAB
+</Message>
+
+
+display elabel brief
+FFFF
+MPU70 NJMBL01 A11A22BC1D1 1E001
+MPU71 NJMBL01 A11A22BC1D1 1E001
+</Message>
+
+
+display clock | no-more
+2025-02-10
+</Message>
+
+
+display board-reset all
+
+Board 70 reset information:
+-- 1. DATE:2025-07-01 TIME:123111
+----------------------------------
+
+</Message>
+
+
+ 70 module cpu_serdes_info
+
+macro3,ds3
+DSDFCNEIU123
+FFJ,32R2,3`,1E2E
+DS_TX:0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x28,0x1111,0x1111,0x1111,
+
+
+macro4,ds4
+DSDFCNEIU123
+FFJ,32R2,3`,1E2E
+DS_TX:0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x3F,0x1111,0x1111,0x1111,
+
+</Message>
+
+serdes slot 70 
+macro 0 lane 0: code-up:0x0;
+</Message>
+
+display temperature | no-more
+Base-Board, Unit:C, Slot 70
+----------------------------------
+40
+----------------------------------
+-
+</Message>
+
+display startup | no-more
+software R23
+</Message>

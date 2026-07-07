@@ -1,0 +1,62 @@
+1
+
+display device
+13
+1
+2
+50 D1SCAC
+51 D1SCAB
+</Message>
+
+
+display elabel brief
+FFFF
+MPU50 DDIGUI5 I65I56FH5I5 5I665
+MPU51 DDIGUI5 I65I56FH5I5 5I665
+</Message>
+
+
+display clock | no-more
+2026-10-01
+</Message>
+
+
+display board-reset all
+
+Board 50 reset information:
+-- 1. DATE:2025-06-20 TIME:123111
+----------------------------------
+
+</Message>
+
+
+ 50 module cpu_serdes_info
+
+macro3,ds3
+DSDFCNEIU123
+FFJ,32R2,3`,1E2E
+DS_TX:0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1E,0x1111,0x1111,0x1111,
+
+
+macro4,ds4
+DSDFCNEIU123
+FFJ,32R2,3`,1E2E
+DS_TX:0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x3F,0x1111,0x1111,0x1111,
+
+</Message>
+
+serdes slot 50 
+macro 0 lane 0: code-up:0x0;
+</Message>
+
+display temperature | no-more
+Base-Board, Unit:C, Slot 50
+----------------------------------
+45
+----------------------------------
+-
+</Message>
+
+display startup | no-more
+software R23
+</Message>

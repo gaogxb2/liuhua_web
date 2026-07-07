@@ -1,0 +1,62 @@
+1
+
+display device
+13
+1
+2
+72 D1SCAC
+73 D1SCAB
+</Message>
+
+
+display elabel brief
+FFFF
+MPU72 SZUBL02 B22B33CD2E2 2F112
+MPU73 SZUBL02 B22B33CD2E2 2F112
+</Message>
+
+
+display clock | no-more
+2026-10-01
+</Message>
+
+
+display board-reset all
+
+Board 72 reset information:
+-- 1. DATE:2025-07-02 TIME:123111
+----------------------------------
+
+</Message>
+
+
+ 72 module cpu_serdes_info
+
+macro3,ds3
+DSDFCNEIU123
+FFJ,32R2,3`,1E2E
+DS_TX:0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x0,0x1111,0x1111,0x1111,
+
+
+macro4,ds4
+DSDFCNEIU123
+FFJ,32R2,3`,1E2E
+DS_TX:0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x1111,0x0,0x1111,0x1111,0x1111,
+
+</Message>
+
+serdes slot 72 
+macro 0 lane 0: code-up:0x0;
+</Message>
+
+display temperature | no-more
+Base-Board, Unit:C, Slot 72
+----------------------------------
+41
+----------------------------------
+-
+</Message>
+
+display startup | no-more
+software R23
+</Message>
