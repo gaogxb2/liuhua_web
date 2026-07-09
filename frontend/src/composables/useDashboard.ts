@@ -41,6 +41,7 @@ export function useDashboard() {
     chips: [],
     provinces: [],
     city_map: {},
+    standalone_cities: [],
     years: [],
     year_month_map: {},
     site_names: [],
@@ -58,6 +59,9 @@ export function useDashboard() {
       for (const c of filterOptions.value.city_map[p] || []) {
         cities.add(c)
       }
+    }
+    for (const c of filterOptions.value.standalone_cities || []) {
+      cities.add(c)
     }
     return Array.from(cities).sort()
   })

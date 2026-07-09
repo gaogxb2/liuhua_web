@@ -10,7 +10,7 @@ import {
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { useDashboard } from '../composables/useDashboard'
-import { matchCityGeoName, PROVINCE_ADCODE } from '../utils/geo'
+import { matchCityGeoName, matchProvinceGeoName, PROVINCE_ADCODE } from '../utils/geo'
 
 const MUNICIPALITIES = ['北京市', '上海市', '天津市', '重庆市']
 const RED_GRADIENT = ['#fecaca', '#fca5a5', '#f87171', '#ef4444', '#dc2626', '#991b1b', '#7f1d1d']
@@ -32,7 +32,8 @@ async function ensureChinaMap() {
 }
 
 async function loadProvinceGeo(provinceName: string) {
-  const adcode = PROVINCE_ADCODE[provinceName]
+  const geoProvince = matchProvinceGeoName(provinceName)
+  const adcode = PROVINCE_ADCODE[geoProvince]
   if (!adcode) return null
   const echarts = await import('echarts')
   const mapName = `province_${adcode}`
@@ -54,8 +55,9 @@ async function loadRegionMap(provinceNames: string[]) {
   }
 
   if (provinceNames.length === 1) {
+    const geoProvince = matchProvinceGeoName(provinceNames[0])
     const geoJson = await loadProvinceGeo(provinceNames[0])
-    const adcode = PROVINCE_ADCODE[provinceNames[0]]
+    const adcode = PROVINCE_ADCODE[geoProvince]
     if (geoJson && adcode) {
       activeMapName.value = `province_${adcode}`
       geoCityNames.value = (geoJson.features || [])
@@ -131,7 +133,7 @@ const option = computed(() => {
     if (isRegionDrill) {
       geoName = matchCityGeoName(item.name, geoCityNames.value)
     } else {
-      geoName = item.name
+      geoName = matchProvinceGeoName(item.name)
     }
     return {
       name: geoName,

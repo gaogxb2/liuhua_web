@@ -87,6 +87,7 @@ class FilterOptionsResponse(BaseModel):
     chips: List[str]
     provinces: List[str]
     city_map: Dict[str, List[str]]
+    standalone_cities: List[str] = Field(default_factory=list)
     years: List[int]
     year_month_map: Dict[int, List[int]] = Field(default_factory=dict)
     site_names: List[str] = Field(default_factory=list)

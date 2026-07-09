@@ -8,7 +8,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from data_processor import DataProcessor
+from data_processor import DataProcessor, AGENT_DEBUG_LOG_PATH
 
 DEFAULT_FOLDER = os.path.join(_ROOT, "logs")
 
@@ -91,14 +91,14 @@ def analyze_folder(folder_path: str, extract_zip: bool = False) -> Dict[str, Any
         _board_records = []
         raise ValueError("没有找到符合条件的文件")
 
-    _board_records = _processor.build_board_records(_current_df)
+    _board_records = _processor.build_board_records(_current_df, analyze_root=_last_folder)
     filters = _processor.get_filter_options(_board_records)
     filters["folder_path"] = _last_folder
     filters.setdefault("site_names", [])
     # #region agent log
     try:
         import json as _json
-        with open("/Users/xianbo/vulcanization/.cursor/debug-a5fec5.log", "a", encoding="utf-8") as _df:
+        with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
             _df.write(_json.dumps({"sessionId": "a5fec5", "hypothesisId": "S1", "location": "analytics.py:analyze_folder", "message": "filters site_names", "data": {"site_names_count": len(filters.get("site_names", [])), "sample": filters.get("site_names", [])[:5]}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
     except OSError:
         pass
@@ -149,7 +149,7 @@ def get_map_stats(
     # #region agent log
     try:
         import json as _json
-        with open("/Users/xianbo/vulcanization/.cursor/debug-a5fec5.log", "a", encoding="utf-8") as _df:
+        with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
             _df.write(_json.dumps({"sessionId": "a5fec5", "hypothesisId": "H1", "location": "analytics.py:get_map_stats", "message": "map stats ratios", "data": {"year": year, "month": month, "overall": result.get("overall"), "items": result.get("items", [])[:5], "record_count": len(records)}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
     except OSError:
         pass
@@ -221,7 +221,7 @@ def get_code_sum_trend(
     # #region agent log
     try:
         import json as _json
-        with open("/Users/xianbo/vulcanization/.cursor/debug-a5fec5.log", "a", encoding="utf-8") as _df:
+        with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
             _df.write(_json.dumps({"sessionId": "a5fec5", "hypothesisId": "T2", "location": "analytics.py:get_code_sum_trend", "message": "trend result", "data": {"chips": chips, "years": years, "months": months, "series_count": len(series), "points": [len(s.get("points", [])) for s in series]}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
     except OSError:
         pass

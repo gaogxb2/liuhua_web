@@ -22,6 +22,7 @@ export interface FilterOptions {
   chips: string[]
   provinces: string[]
   city_map: Record<string, string[]>
+  standalone_cities: string[]
   years: number[]
   year_month_map: Record<number, number[]>
   site_names: string[]

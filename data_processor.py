@@ -7,7 +7,86 @@ import shutil
 import pandas as pd
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Set
+
+
+from geo_city_data import GEOJSON_CITY_NAMES, GEOJSON_CITY_ALIASES, _GEO_CITY_MATCH_ORDER
+
+# 调试日志写在项目根目录，便于跨机器查看
+_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+AGENT_DEBUG_LOG_PATH = os.path.join(_PROJECT_ROOT, "debug.log")
+
+
+# 中国省级行政区名称集合（含简称与全称，用于文件夹名子串匹配）
+CHINA_PROVINCES: Set[str] = {
+    '北京市', '天津市', '上海市', '重庆市',
+    '河北省', '山西省', '辽宁省', '吉林省', '黑龙江省',
+    '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省',
+    '河南省', '湖北省', '湖南省', '广东省', '海南省',
+    '四川省', '贵州省', '云南省', '陕西省', '甘肃省', '青海省', '台湾省',
+    '内蒙古自治区', '广西壮族自治区', '西藏自治区', '宁夏回族自治区', '新疆维吾尔自治区',
+    '香港特别行政区', '澳门特别行政区',
+    '北京', '天津', '上海', '重庆',
+    '河北', '山西', '辽宁', '吉林', '黑龙江',
+    '江苏', '浙江', '安徽', '福建', '江西', '山东',
+    '河南', '湖北', '湖南', '广东', '海南',
+    '四川', '贵州', '云南', '陕西', '甘肃', '青海', '台湾',
+    '内蒙古', '广西', '西藏', '宁夏', '新疆', '香港', '澳门',
+}
+
+# 中国地级行政区名称集合（地级市、自治州、盟、地区等）
+CHINA_CITIES: Set[str] = {
+    '北京市', '天津市', '上海市', '重庆市',
+    '石家庄市', '唐山市', '秦皇岛市', '邯郸市', '邢台市', '保定市', '张家口市', '承德市', '沧州市', '廊坊市', '衡水市',
+    '太原市', '大同市', '阳泉市', '长治市', '晋城市', '朔州市', '晋中市', '运城市', '忻州市', '临汾市', '吕梁市',
+    '呼和浩特市', '包头市', '乌海市', '赤峰市', '通辽市', '鄂尔多斯市', '呼伦贝尔市', '巴彦淖尔市', '乌兰察布市',
+    '沈阳市', '大连市', '鞍山市', '抚顺市', '本溪市', '丹东市', '锦州市', '营口市', '阜新市', '辽阳市', '盘锦市', '铁岭市', '朝阳市', '葫芦岛市',
+    '长春市', '吉林市', '四平市', '辽源市', '通化市', '白山市', '松原市', '白城市',
+    '哈尔滨市', '齐齐哈尔市', '鸡西市', '鹤岗市', '双鸭山市', '大庆市', '伊春市', '佳木斯市', '七台河市', '牡丹江市', '黑河市', '绥化市',
+    '南京市', '无锡市', '徐州市', '常州市', '苏州市', '南通市', '连云港市', '淮安市', '盐城市', '扬州市', '镇江市', '泰州市', '宿迁市',
+    '杭州市', '宁波市', '温州市', '嘉兴市', '湖州市', '绍兴市', '金华市', '衢州市', '舟山市', '台州市', '丽水市',
+    '合肥市', '芜湖市', '蚌埠市', '淮南市', '马鞍山市', '淮北市', '铜陵市', '安庆市', '黄山市', '滁州市', '阜阳市', '宿州市', '六安市', '亳州市', '池州市', '宣城市',
+    '福州市', '厦门市', '莆田市', '三明市', '泉州市', '漳州市', '南平市', '龙岩市', '宁德市',
+    '南昌市', '景德镇市', '萍乡市', '九江市', '新余市', '鹰潭市', '赣州市', '吉安市', '宜春市', '抚州市', '上饶市',
+    '济南市', '青岛市', '淄博市', '枣庄市', '东营市', '烟台市', '潍坊市', '济宁市', '泰安市', '威海市', '日照市', '临沂市', '德州市', '聊城市', '滨州市', '菏泽市',
+    '郑州市', '开封市', '洛阳市', '平顶山市', '安阳市', '鹤壁市', '新乡市', '焦作市', '濮阳市', '许昌市', '漯河市', '三门峡市', '南阳市', '商丘市', '信阳市', '周口市', '驻马店市',
+    '武汉市', '黄石市', '十堰市', '宜昌市', '襄阳市', '鄂州市', '荆门市', '孝感市', '荆州市', '黄冈市', '咸宁市', '随州市',
+    '长沙市', '株洲市', '湘潭市', '衡阳市', '邵阳市', '岳阳市', '常德市', '张家界市', '益阳市', '郴州市', '永州市', '怀化市', '娄底市',
+    '广州市', '韶关市', '深圳市', '珠海市', '汕头市', '佛山市', '江门市', '湛江市', '茂名市', '肇庆市', '惠州市', '梅州市', '汕尾市', '河源市', '阳江市', '清远市', '东莞市', '中山市', '潮州市', '揭阳市', '云浮市',
+    '南宁市', '柳州市', '桂林市', '梧州市', '北海市', '防城港市', '钦州市', '贵港市', '玉林市', '百色市', '贺州市', '河池市', '来宾市', '崇左市',
+    '海口市', '三亚市', '三沙市', '儋州市',
+    '成都市', '自贡市', '攀枝花市', '泸州市', '德阳市', '绵阳市', '广元市', '遂宁市', '内江市', '乐山市', '南充市', '眉山市', '宜宾市', '广安市', '达州市', '雅安市', '巴中市', '资阳市',
+    '贵阳市', '六盘水市', '遵义市', '安顺市', '毕节市', '铜仁市',
+    '昆明市', '曲靖市', '玉溪市', '保山市', '昭通市', '丽江市', '普洱市', '临沧市',
+    '拉萨市', '日喀则市', '昌都市', '林芝市', '山南市', '那曲市',
+    '西安市', '铜川市', '宝鸡市', '咸阳市', '渭南市', '延安市', '汉中市', '榆林市', '安康市', '商洛市',
+    '兰州市', '嘉峪关市', '金昌市', '白银市', '天水市', '武威市', '张掖市', '平凉市', '酒泉市', '庆阳市', '定西市', '陇南市',
+    '西宁市', '海东市',
+    '银川市', '石嘴山市', '吴忠市', '固原市', '中卫市',
+    '乌鲁木齐市', '克拉玛依市', '吐鲁番市', '哈密市',
+    '台北市', '高雄市', '台中市', '台南市',
+    '香港', '澳门',
+}
+
+MUNICIPALITY_KEYWORDS: Dict[str, str] = {
+    '北京': '北京市',
+    '天津': '天津市',
+    '上海': '上海市',
+    '重庆': '重庆市',
+}
+
+# GeoJSON 省级标准名称（与 DataV 地图一致）
+GEOJSON_PROVINCE_NAMES: Set[str] = {
+    '北京市', '天津市', '河北省', '山西省', '内蒙古自治区', '辽宁省', '吉林省', '黑龙江省',
+    '上海市', '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省', '河南省',
+    '湖北省', '湖南省', '广东省', '广西壮族自治区', '海南省', '重庆市', '四川省',
+    '贵州省', '云南省', '西藏自治区', '陕西省', '甘肃省', '青海省', '宁夏回族自治区',
+    '新疆维吾尔自治区', '台湾省', '香港特别行政区', '澳门特别行政区',
+}
+
+# 匹配时优先较长名称
+_PROVINCE_MATCH_ORDER = sorted(CHINA_PROVINCES, key=len, reverse=True)
+_CITY_MATCH_ORDER = sorted(CHINA_CITIES, key=len, reverse=True)
 
 
 class DataProcessor:
@@ -74,24 +153,219 @@ class DataProcessor:
             return name
         return f"{name}市"
 
-    def _parse_location_from_path(self, relative_path: str, filename: str = "") -> Tuple[str, str]:
-        """从工程师报告所在目录的上级文件夹解析省份和城市。
+    def _to_geo_province_name(self, name: str) -> str:
+        """将识别到的省份名规范为 GeoJSON 区域名；无法识别则保留原文件夹名。"""
+        if not name:
+            return ""
+        name = name.strip()
+        if name in GEOJSON_PROVINCE_NAMES:
+            return name
+        if name in CHINA_PROVINCES:
+            return self._normalize_province_name(name)
+        return name
 
-        典型路径：{年份巡检}/{省}/{市}/工程师报告/xxx.txt
-        取「工程师报告」文件夹的上一级为市、上两级为省。
+    def _match_geo_city_name(self, text: str) -> str:
+        """将文件夹名/城市名匹配为 DataV GeoJSON 地级标准名称。"""
+        if not text:
+            return ""
+        text = text.strip()
+        if text in GEOJSON_CITY_NAMES:
+            return text
+        if text in GEOJSON_CITY_ALIASES:
+            return GEOJSON_CITY_ALIASES[text]
+        for name in _GEO_CITY_MATCH_ORDER:
+            if name in text:
+                return name
+        for name in _GEO_CITY_MATCH_ORDER:
+            if name.endswith('市'):
+                base = name[:-1]
+                if len(base) >= 2 and text.startswith(base):
+                    return name
+        for suffix, strip_len in (('地区', 2), ('盟', 1), ('自治州', 3)):
+            for name in _GEO_CITY_MATCH_ORDER:
+                if name.endswith(suffix):
+                    base = name[:-strip_len]
+                    if len(base) >= 2 and (text.startswith(base) or base in text):
+                        return name
+        for alias, full in sorted(GEOJSON_CITY_ALIASES.items(), key=lambda x: len(x[0]), reverse=True):
+            if alias != full and alias in text and full in GEOJSON_CITY_NAMES:
+                return full
+        if not text.endswith('市'):
+            with_suffix = text + '市'
+            if with_suffix in GEOJSON_CITY_NAMES:
+                return with_suffix
+            if with_suffix in GEOJSON_CITY_ALIASES:
+                return GEOJSON_CITY_ALIASES[with_suffix]
+        return ""
+
+    def _to_geo_city_name(self, name: str) -> str:
+        """将识别到的城市名规范为 GeoJSON 区域名；无法识别则保留原文件夹名。"""
+        if not name:
+            return ""
+        matched = self._match_geo_city_name(name.strip())
+        result = matched if matched else name.strip()
+        # #region agent log
+        if name.strip() and name.strip() != result:
+            try:
+                with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
+                    _df.write(json.dumps({
+                        "sessionId": "1d1172",
+                        "runId": "geo-cities",
+                        "hypothesisId": "H1",
+                        "location": "data_processor.py:_to_geo_city_name",
+                        "message": "city normalized to geojson",
+                        "data": {"input": name, "output": result, "in_geojson": result in GEOJSON_CITY_NAMES},
+                        "timestamp": int(__import__("time").time() * 1000),
+                    }, ensure_ascii=False) + "\n")
+            except OSError:
+                pass
+        # #endregion
+        return result
+
+    def _match_longest_in_set(self, text: str, ordered_names: List[str]) -> str:
+        """在 text 中查找最长匹配的行政区划名称（相连子串）。"""
+        if not text:
+            return ""
+        for name in ordered_names:
+            if name in text:
+                return name
+        return ""
+
+    def _match_city_from_folder(self, text: str) -> str:
+        """在文件夹名中匹配城市，返回 GeoJSON 地级标准名称。"""
+        if not text:
+            return ""
+        matched = self._match_geo_city_name(text)
+        if matched:
+            return matched
+        matched = self._match_longest_in_set(text, _CITY_MATCH_ORDER)
+        if matched:
+            return matched
+        for name in _CITY_MATCH_ORDER:
+            if name.endswith('市'):
+                base = name[:-1]
+                if len(base) >= 2 and text.startswith(base):
+                    return name
+        if not text.endswith('市'):
+            matched = self._match_longest_in_set(text + '市', _CITY_MATCH_ORDER)
+            if matched:
+                return matched
+        return ""
+
+    def _extract_municipality_city(self, text: str) -> str:
+        """若文件夹名含直辖市关键词，返回标准市名。"""
+        if not text:
+            return ""
+        for keyword, full_name in MUNICIPALITY_KEYWORDS.items():
+            if keyword in text:
+                return full_name
+        return ""
+
+    def _parse_location_from_path(self, relative_path: str, filename: str = "") -> Tuple[str, str]:
+        """从分析目录相对路径的下两级/下三级文件夹名解析省、市。
+
+        - 下两级文件夹名（parts[1]）：匹配省集合；无匹配则用整个文件夹名
+        - 下三级文件夹名（parts[2]）：匹配市集合；无匹配则用整个文件夹名
+        - 下两级或三级含直辖市关键词：省、市均设为直辖市标准名（同时进入省份与城市筛选项）
         """
         parts = [p for p in Path(relative_path).parts if p and p != '.']
-        report_idx = None
-        for i, part in enumerate(parts):
-            if part == '工程师报告' or part.endswith('工程师报告'):
-                report_idx = i
-                break
+        if parts and '.' in parts[-1]:
+            folder_parts = parts[:-1]
+        else:
+            folder_parts = parts
 
-        if report_idx is not None and report_idx >= 2:
-            province = self._normalize_province_name(parts[report_idx - 2])
-            city = self._normalize_city_name(parts[report_idx - 1])
-            if province and city:
-                return province, city
+        level2 = folder_parts[1] if len(folder_parts) > 1 else ""
+        level3 = folder_parts[2] if len(folder_parts) > 2 else ""
+
+        province = ""
+        city = ""
+        province_match_type = ""
+        city_match_type = ""
+        matched_province_raw = ""
+        matched_city_raw = ""
+        unmatched_province_folder = ""
+        unmatched_city_folder = ""
+
+        muni_l2 = self._extract_municipality_city(level2)
+        muni_l3 = self._extract_municipality_city(level3)
+
+        if muni_l2:
+            province = muni_l2
+            city = muni_l2
+            province_match_type = "municipality_l2"
+            city_match_type = "municipality_l2"
+            matched_province_raw = muni_l2
+            matched_city_raw = muni_l2
+        else:
+            if level2:
+                matched_province = self._match_longest_in_set(level2, _PROVINCE_MATCH_ORDER)
+                if matched_province:
+                    province = matched_province
+                    province_match_type = "province_set"
+                    matched_province_raw = matched_province
+                else:
+                    province = level2
+                    province_match_type = "fallback_whole_folder"
+                    unmatched_province_folder = level2
+
+        if muni_l3:
+            city = muni_l3
+            city_match_type = "municipality_l3"
+            matched_city_raw = muni_l3
+            if muni_l2:
+                pass
+            else:
+                province = muni_l3
+                province_match_type = "municipality_l3"
+                matched_province_raw = muni_l3
+        elif level3:
+            matched_city = self._match_city_from_folder(level3)
+            if matched_city:
+                city = matched_city
+                city_match_type = "city_geo_match"
+                matched_city_raw = matched_city
+            else:
+                city = level3
+                city_match_type = "fallback_whole_folder"
+                unmatched_city_folder = level3
+
+        province_before_geo = province
+        city_before_geo = city
+        province = self._to_geo_province_name(province)
+        city = self._to_geo_city_name(city)
+
+        # #region agent log
+        try:
+            with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
+                _df.write(json.dumps({
+                    "sessionId": "1d1172",
+                    "runId": "path-parse",
+                    "hypothesisId": "LOC",
+                    "location": "data_processor.py:_parse_location_from_path",
+                    "message": "省市区路径解析",
+                    "data": {
+                        "relative_path": relative_path,
+                        "level2_folder": level2,
+                        "level3_folder": level3,
+                        "province_match_type": province_match_type,
+                        "city_match_type": city_match_type,
+                        "matched_province_raw": matched_province_raw,
+                        "matched_city_raw": matched_city_raw,
+                        "unmatched_province_folder": unmatched_province_folder,
+                        "unmatched_city_folder": unmatched_city_folder,
+                        "province_before_geo": province_before_geo,
+                        "city_before_geo": city_before_geo,
+                        "province_final": province,
+                        "city_final": city,
+                    },
+                    "timestamp": int(__import__("time").time() * 1000),
+                }, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
+        # #endregion
+
+        if province or city:
+            return province, city
 
         if filename:
             return self._parse_location_from_filename(filename)
@@ -124,6 +398,8 @@ class DataProcessor:
                 province, city = legacy_match.group(1), legacy_match.group(2)
                 pattern_used = "legacy_two_part"
 
+        province = self._to_geo_province_name(province)
+        city = self._to_geo_city_name(city)
         return province, city
     
     def get_location_stats(
@@ -957,7 +1233,7 @@ class DataProcessor:
                     # #region agent log
                     try:
                         import json as _json
-                        with open("/Users/xianbo/vulcanization/.cursor/debug-a5fec5.log", "a", encoding="utf-8") as _df:
+                        with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
                             _df.write(_json.dumps({"sessionId": "a5fec5", "hypothesisId": "L1", "location": "data_processor.py:analyze_folder", "message": "location from folder path", "data": {"relative_path": relative_path, "filename": item.name, "province": province, "city": city, "source": "folder" if "工程师报告" in relative_path else "filename"}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
                     except OSError:
                         pass
@@ -1246,12 +1522,49 @@ class DataProcessor:
         date_match = re.search(r'(\d{4}-\d{2}-\d{2})', block_match.group(1))
         return date_match.group(1) if date_match else None
 
+    def _parse_folder_collection_date(self, path_str: str) -> Optional[str]:
+        """从路径文件夹名提取采集日期 YYYYMMDD，优先取离文件最近的文件夹。"""
+        if not path_str or not str(path_str).strip():
+            return None
+        parts = Path(str(path_str)).parts
+        if not parts:
+            return None
+        folder_parts = parts[:-1] if '.' in parts[-1] else parts
+        for part in reversed(folder_parts):
+            for match in re.finditer(r'(\d{8})', part):
+                raw = match.group(1)
+                try:
+                    year = int(raw[0:4])
+                    month = int(raw[4:6])
+                    day = int(raw[6:8])
+                    if 1900 <= year <= 2100 and 1 <= month <= 12 and 1 <= day <= 31:
+                        return f"{year:04d}-{month:02d}-{day:02d}"
+                except (ValueError, TypeError):
+                    continue
+        return None
+
     def _resolve_year_month_from_clock(
         self,
         clock_date: str,
         relative_path: str,
+        analyze_root: Optional[str] = None,
     ) -> Tuple[Optional[int], Optional[int]]:
-        """年份、月份均来自 display clock；无 clock 时年份回退路径，月份为空"""
+        """年份、月份：路径文件夹 YYYYMMDD 优先，否则 display clock；再无则年份回退路径首段"""
+        folder_date = self._parse_folder_collection_date(relative_path)
+        if not folder_date and analyze_root:
+            folder_date = self._parse_folder_collection_date(analyze_root)
+        if folder_date:
+            year = int(folder_date[:4])
+            month = int(folder_date[5:7])
+            # #region agent log
+            try:
+                import json as _json
+                with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
+                    _df.write(_json.dumps({"sessionId": "1d1172", "runId": "pre-fix", "hypothesisId": "H3-H4", "location": "data_processor.py:_resolve_year_month_from_clock", "message": "year month from folder", "data": {"relative_path": relative_path, "analyze_root": analyze_root, "folder_date": folder_date, "clock_date": clock_date, "year": year, "month": month}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
+            except OSError:
+                pass
+            # #endregion
+            return year, month
         date_str = self._parse_record_date(clock_date)
         if date_str:
             return self._parse_record_year(date_str), self._parse_record_month(date_str)
@@ -1353,6 +1666,7 @@ class DataProcessor:
         self,
         df: pd.DataFrame,
         chip_barcode2: Optional[str] = None,
+        analyze_root: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """将 DataFrame 转为单板级记录列表（每个单板sn在同一省市、同一年月计一块单板）"""
         if df.empty or '匹配值' not in df.columns:
@@ -1373,7 +1687,7 @@ class DataProcessor:
         def _row_year_month(row) -> Tuple[Optional[int], Optional[int]]:
             file_path = str(row.get('文件路径', '') or '')
             clock_date = file_clock.get(file_path, str(row.get('采集日期', '') or '').strip())
-            return self._resolve_year_month_from_clock(clock_date, file_path)
+            return self._resolve_year_month_from_clock(clock_date, file_path, analyze_root)
 
         work[['_年份', '_月份']] = work.apply(
             lambda row: pd.Series(_row_year_month(row)),
@@ -1395,6 +1709,7 @@ class DataProcessor:
             month = self._normalize_optional_int(row.get('_月份'))
             fname = str(row.get('文件名', ''))
             site_name = fname[:-4] if fname.lower().endswith('.txt') else fname
+            folder_date = self._parse_folder_collection_date(file_path) or self._parse_folder_collection_date(analyze_root or "")
             records.append({
                 '文件名': fname,
                 '网元名称': site_name,
@@ -1406,7 +1721,7 @@ class DataProcessor:
                 '条码2': str(row.get('条码2', '') or ''),
                 '时间': time_str,
                 '采集日期': clock_date,
-                '日期': self._parse_record_date(clock_date) or self._parse_record_date(time_str),
+                '日期': folder_date or self._parse_record_date(clock_date) or self._parse_record_date(time_str),
                 '年份': year,
                 '月份': month,
                 'codes': codes,
@@ -1418,7 +1733,7 @@ class DataProcessor:
         try:
             import json as _json
             from collections import Counter as _Counter
-            with open("/Users/xianbo/vulcanization/.cursor/debug-a5fec5.log", "a", encoding="utf-8") as _df:
+            with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
                 _df.write(_json.dumps({"sessionId": "a5fec5", "hypothesisId": "M1", "location": "data_processor.py:build_board_records", "message": "board merge by year-month", "data": {"slot_records": len(records), "merged_records": len(merged), "by_year_month": {f"{y}-{m}": c for (y, m), c in _Counter((r.get("年份"), r.get("月份")) for r in merged).items()}}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
         except OSError:
             pass
@@ -1430,14 +1745,42 @@ class DataProcessor:
         chips = sorted({r['条码2'] for r in board_records if r.get('条码2')})
         provinces = sorted({r['省份'] for r in board_records if r.get('省份')})
         city_map: Dict[str, List[str]] = {}
+        standalone_cities: List[str] = []
         for r in board_records:
             p, c = r.get('省份', ''), r.get('城市', '')
-            if p and c:
+            if not c:
+                continue
+            if p:
                 city_map.setdefault(p, [])
                 if c not in city_map[p]:
                     city_map[p].append(c)
+            else:
+                if c not in standalone_cities:
+                    standalone_cities.append(c)
         for p in city_map:
             city_map[p] = sorted(city_map[p])
+        standalone_cities = sorted(standalone_cities)
+        # #region agent log
+        try:
+            all_cities = sorted({c for cities in city_map.values() for c in cities} | set(standalone_cities))
+            with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
+                _df.write(json.dumps({
+                    "sessionId": "1d1172",
+                    "runId": "geo-cities",
+                    "hypothesisId": "H2-H3",
+                    "location": "data_processor.py:get_filter_options",
+                    "message": "filter city geojson coverage",
+                    "data": {
+                        "provinces": provinces,
+                        "all_cities": all_cities,
+                        "geojson_hits": [c for c in all_cities if c in GEOJSON_CITY_NAMES],
+                        "non_geojson": [c for c in all_cities if c not in GEOJSON_CITY_NAMES],
+                    },
+                    "timestamp": int(__import__("time").time() * 1000),
+                }, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
+        # #endregion
         years = sorted({r['年份'] for r in board_records if r.get('年份') is not None})
         year_month_map: Dict[int, List[int]] = {}
         for r in board_records:
@@ -1453,6 +1796,7 @@ class DataProcessor:
             'chips': chips,
             'provinces': provinces,
             'city_map': city_map,
+            'standalone_cities': standalone_cities,
             'years': years,
             'year_month_map': year_month_map,
             'site_names': site_names,
@@ -1688,12 +2032,32 @@ class DataProcessor:
             codes = r.get('codes', [])
             if not codes:
                 continue
-            rep = min(codes)
-            code_counts[rep] = code_counts.get(rep, 0) + 1
-        return [
-            {'code_value': k, 'code_hex': f'0x{k:02X}', 'board_count': code_counts.get(k, 0)}
-            for k in range(64)
+            min_code = min(codes)
+            code_counts[min_code] = code_counts.get(min_code, 0) + 1
+        result = [
+            {'code_value': k, 'code_hex': f'0x{k:02X}', 'board_count': v}
+            for k, v in sorted(code_counts.items())
         ]
+        # #region agent log
+        try:
+            with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
+                _df.write(json.dumps({
+                    "sessionId": "1d1172",
+                    "runId": "pre-fix",
+                    "hypothesisId": "H5",
+                    "location": "data_processor.py:get_code_distribution",
+                    "message": "dynamic code bar axis",
+                    "data": {
+                        "filtered_boards": len(filtered),
+                        "code_values": [x['code_value'] for x in result],
+                        "counts": result,
+                    },
+                    "timestamp": int(__import__("time").time() * 1000),
+                }, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
+        # #endregion
+        return result
 
     def get_fault_trend(
         self,
@@ -1742,7 +2106,7 @@ class DataProcessor:
         # #region agent log
         try:
             import json as _json
-            with open("/Users/xianbo/vulcanization/.cursor/debug-a5fec5.log", "a", encoding="utf-8") as _df:
+            with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
                 _df.write(_json.dumps({"sessionId": "a5fec5", "hypothesisId": "T1", "location": "data_processor.py:get_fault_trend", "message": "fault trend ratio", "data": {"year": year, "point_count": len(result), "sample": result[:3]}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
         except OSError:
             pass

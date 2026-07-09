@@ -53,10 +53,33 @@ export function toGeoRegionName(name: string): string {
   return name
 }
 
+/** 将数据中的省名匹配到 GeoJSON / PROVINCE_ADCODE 中的标准名称 */
+export function matchProvinceGeoName(dataProvince: string, geoNames?: string[]): string {
+  if (!dataProvince) return ''
+  const candidates = geoNames?.length ? geoNames : Object.keys(PROVINCE_ADCODE)
+  if (candidates.includes(dataProvince)) return dataProvince
+  const dataShort = toGeoRegionName(dataProvince)
+  const hit = candidates.find((g) => toGeoRegionName(g) === dataShort)
+  return hit || dataProvince
+}
+
+/** GeoJSON 地级标准名称与别名（自动生成，与后端 geo_city_data.py 一致） */
+import { CITY_GEO_ALIASES, GEOJSON_CITY_NAMES } from './geoCityData'
+
 /** 将数据中的市名匹配到 GeoJSON 中的名称 */
 export function matchCityGeoName(dataCity: string, geoNames: string[]): string {
+  if (!dataCity) return ''
   if (geoNames.includes(dataCity)) return dataCity
+  if (GEOJSON_CITY_NAMES.has(dataCity)) return dataCity
+
+  const resolved =
+    CITY_GEO_ALIASES[dataCity] || CITY_GEO_ALIASES[dataCity.replace(/市$/, '')]
+
+  if (resolved && (!geoNames.length || geoNames.includes(resolved))) return resolved
+
   const shortName = dataCity.replace(/市$/, '')
   const hit = geoNames.find((g) => g === shortName || g.replace(/市$/, '') === shortName)
-  return hit || dataCity
+  if (hit) return hit
+
+  return resolved || dataCity
 }
