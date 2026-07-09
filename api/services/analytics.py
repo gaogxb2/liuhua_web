@@ -8,7 +8,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from data_processor import DataProcessor, AGENT_DEBUG_LOG_PATH
+from data_processor import DataProcessor, AGENT_DEBUG_LOG_PATH, DEBUG_SESSION_LOG_PATH
 
 DEFAULT_FOLDER = os.path.join(_ROOT, "logs")
 
@@ -151,6 +151,9 @@ def get_map_stats(
         import json as _json
         with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
             _df.write(_json.dumps({"sessionId": "a5fec5", "hypothesisId": "H1", "location": "analytics.py:get_map_stats", "message": "map stats ratios", "data": {"year": year, "month": month, "overall": result.get("overall"), "items": result.get("items", [])[:5], "record_count": len(records)}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
+        unique_slots = len({(r.get("文件路径"), r.get("匹配值"), r.get("年份"), r.get("月份")) for r in records if str(r.get("匹配值", "")).strip()})
+        with open(DEBUG_SESSION_LOG_PATH, "a", encoding="utf-8") as _df:
+            _df.write(_json.dumps({"sessionId": "c939a3", "runId": "post-fix", "hypothesisId": "H3", "location": "analytics.py:get_map_stats", "message": "total_count vs regex slot count", "data": {"year": year, "month": month, "displayed_total_count": result.get("overall", {}).get("total_count"), "filtered_record_count": len(records), "unique_regex_slots": unique_slots}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
     except OSError:
         pass
     # #endregion

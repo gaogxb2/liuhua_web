@@ -161,6 +161,9 @@ export function useDashboard() {
     alerts.value = alertList
     codeBarData.value = bar
     totalBoards.value = map.overall.total_count
+    // #region agent log
+    fetch('http://127.0.0.1:7294/ingest/d453560c-d6b4-4b8f-badc-3989933f19f1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c939a3'},body:JSON.stringify({sessionId:'c939a3',hypothesisId:'H4',location:'useDashboard.ts:refreshCharts',message:'frontend totalBoards from map',data:{totalBoards:map.overall.total_count,year,month,chips,provinces,cities,siteNames},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
   }
 
   async function runAnalyze(extractZip = false) {

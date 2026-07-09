@@ -15,6 +15,7 @@ from geo_city_data import GEOJSON_CITY_NAMES, GEOJSON_CITY_ALIASES, _GEO_CITY_MA
 # 调试日志写在项目根目录，便于跨机器查看
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 AGENT_DEBUG_LOG_PATH = os.path.join(_PROJECT_ROOT, "debug.log")
+DEBUG_SESSION_LOG_PATH = os.path.join(_PROJECT_ROOT, ".cursor", "debug-c939a3.log")
 
 
 # 中国省级行政区名称集合（含简称与全称，用于文件夹名子串匹配）
@@ -1632,16 +1633,17 @@ class DataProcessor:
         return self._parse_record_year(time_str)
 
     def _merge_board_records_by_sn(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """同一单板sn在同一省市、同一年月只计一块单板，合并多槽位及同月内重复扫描"""
+        """按 config 主正则匹配的槽位（匹配值）计单板；同槽位多 lane 的 code 合并去重"""
         groups: Dict[str, List[Dict[str, Any]]] = {}
         for r in records:
             sn = str(r.get('条码2', '') or '').strip()
             year = r.get('年份')
             month = r.get('月份')
+            slot = str(r.get('匹配值', '') or '').strip()
             if sn:
-                key = f"{sn}|{r.get('省份', '')}|{r.get('城市', '')}|{year}|{month}"
+                key = f"{sn}|{r.get('省份', '')}|{r.get('城市', '')}|{year}|{month}|{slot}"
             else:
-                key = f"{r.get('文件路径', '')}|{r.get('匹配值', '')}"
+                key = f"{r.get('文件路径', '')}|{slot}"
             groups.setdefault(key, []).append(r)
 
         merged: List[Dict[str, Any]] = []
@@ -1668,7 +1670,7 @@ class DataProcessor:
         chip_barcode2: Optional[str] = None,
         analyze_root: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """将 DataFrame 转为单板级记录列表（每个单板sn在同一省市、同一年月计一块单板）"""
+        """将 DataFrame 转为单板级记录列表（每个 config 主正则匹配槽位计一块单板）"""
         if df.empty or '匹配值' not in df.columns:
             return []
 
@@ -1735,6 +1737,10 @@ class DataProcessor:
             from collections import Counter as _Counter
             with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
                 _df.write(_json.dumps({"sessionId": "a5fec5", "hypothesisId": "M1", "location": "data_processor.py:build_board_records", "message": "board merge by year-month", "data": {"slot_records": len(records), "merged_records": len(merged), "by_year_month": {f"{y}-{m}": c for (y, m), c in _Counter((r.get("年份"), r.get("月份")) for r in merged).items()}}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
+            slot_by_ym = {f"{y}-{m}": c for (y, m), c in _Counter((r.get("年份"), r.get("月份")) for r in records).items()}
+            merged_by_ym = {f"{y}-{m}": c for (y, m), c in _Counter((r.get("年份"), r.get("月份")) for r in merged).items()}
+            with open(DEBUG_SESSION_LOG_PATH, "a", encoding="utf-8") as _df:
+                _df.write(_json.dumps({"sessionId": "c939a3", "runId": "post-fix", "hypothesisId": "H1", "location": "data_processor.py:build_board_records", "message": "regex slot vs merged board count", "data": {"slot_records": len(records), "merged_records": len(merged), "slot_by_year_month": slot_by_ym, "merged_by_year_month": merged_by_ym, "with_match_value": sum(1 for r in records if str(r.get("匹配值", "")).strip()), "with_barcode2": sum(1 for r in records if str(r.get("条码2", "")).strip())}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
         except OSError:
             pass
         # #endregion
