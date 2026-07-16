@@ -31,9 +31,23 @@ export async function analyze(folderPath: string, extractZip = false) {
   return data
 }
 
-export async function fetchFilters(chips: string[] = []) {
+export async function fetchFilters(
+  chips: string[] = [],
+  provinces: string[] = [],
+  cities: string[] = [],
+  siteNames: string[] = [],
+  years: number[] = [],
+  months: number[] = [],
+) {
   const { data } = await http.get<FilterOptions>('/filters', {
-    params: chips.length ? { chip: joinList(chips) } : {},
+    params: {
+      chip: chips.length ? joinList(chips) : undefined,
+      province: provinces.length ? joinList(provinces) : undefined,
+      city: cities.length ? joinList(cities) : undefined,
+      site: siteNames.length ? joinList(siteNames) : undefined,
+      years: years.length ? joinNums(years) : undefined,
+      months: months.length ? joinNums(months) : undefined,
+    },
   })
   return data
 }
@@ -44,7 +58,7 @@ export async function fetchMap(
   cities: string[] = [],
   siteNames: string[] = [],
   year: number | null = null,
-  month: number | null = null,
+  months: number[] = [],
 ) {
   const { data } = await http.get<MapStats>('/map', {
     params: {
@@ -53,7 +67,8 @@ export async function fetchMap(
       city: joinList(cities),
       site: joinList(siteNames),
       year,
-      month,
+      months: months.length ? joinNums(months) : undefined,
+      month: months.length === 1 ? months[0] : undefined,
     },
   })
   return data
@@ -65,7 +80,7 @@ export async function fetchAlerts(
   cities: string[] = [],
   siteNames: string[] = [],
   year: number | null = null,
-  month: number | null = null,
+  months: number[] = [],
 ) {
   const { data } = await http.get<AlertItem[]>('/alerts', {
     params: {
@@ -74,7 +89,8 @@ export async function fetchAlerts(
       city: joinList(cities),
       site: joinList(siteNames),
       year,
-      month,
+      months: months.length ? joinNums(months) : undefined,
+      month: months.length === 1 ? months[0] : undefined,
     },
   })
   return data
@@ -86,7 +102,7 @@ export async function fetchCodeBar(
   cities: string[] = [],
   siteNames: string[] = [],
   year: number | null = null,
-  month: number | null = null,
+  months: number[] = [],
 ) {
   const { data } = await http.get<CodeBarItem[]>('/charts/code-bar', {
     params: {
@@ -95,7 +111,8 @@ export async function fetchCodeBar(
       city: joinList(cities),
       site: joinList(siteNames),
       year,
-      month,
+      months: months.length ? joinNums(months) : undefined,
+      month: months.length === 1 ? months[0] : undefined,
     },
   })
   return data

@@ -26,6 +26,7 @@ class MapStatsResponse(BaseModel):
     map_provinces: List[str] = []
     display_year: Optional[int] = None
     display_month: Optional[int] = None
+    display_months: List[int] = Field(default_factory=list)
     overall: Dict[str, Any]
 
 

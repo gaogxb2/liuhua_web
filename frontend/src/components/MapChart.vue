@@ -109,7 +109,10 @@ const mapTitle = computed(() => {
   const stats = dashboard.mapStats.value
   const { provinces, cities } = dashboard.filters
   const yearLabel = stats?.display_year ? `${stats.display_year}年` : ''
-  const monthLabel = stats?.display_month ? `${stats.display_month}月` : ''
+  const months = (stats?.display_months?.length ? stats.display_months : (stats?.display_month != null ? [stats.display_month] : []))
+    .slice()
+    .sort((a, b) => a - b)
+  const monthLabel = months.length ? months.map((m) => `${m}月`).join('、') : ''
   const periodLabel = yearLabel && monthLabel ? `${yearLabel}${monthLabel}` : yearLabel
   if (!stats) return '地域硫化比例地图'
   if (cities.length) {

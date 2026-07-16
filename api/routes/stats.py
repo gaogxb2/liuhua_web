@@ -15,18 +15,36 @@ def _handle_service_error(exc: Exception):
 
 
 @router.get("/chips")
-def get_chips(chip: Optional[str] = None):
+def get_chips(
+    chip: Optional[str] = None,
+    province: Optional[str] = None,
+    city: Optional[str] = None,
+    site: Optional[str] = None,
+    years: Optional[str] = None,
+    months: Optional[str] = None,
+):
     try:
-        options = analytics.get_filter_options(chip=chip)
+        options = analytics.get_filter_options(
+            chip=chip, province=province, city=city, site=site, years=years, months=months,
+        )
         return {"chips": options["chips"]}
     except ValueError as exc:
         _handle_service_error(exc)
 
 
 @router.get("/filters", response_model=FilterOptionsResponse)
-def get_filters(chip: Optional[str] = None):
+def get_filters(
+    chip: Optional[str] = None,
+    province: Optional[str] = None,
+    city: Optional[str] = None,
+    site: Optional[str] = None,
+    years: Optional[str] = None,
+    months: Optional[str] = None,
+):
     try:
-        return FilterOptionsResponse(**analytics.get_filter_options(chip=chip))
+        return FilterOptionsResponse(**analytics.get_filter_options(
+            chip=chip, province=province, city=city, site=site, years=years, months=months,
+        ))
     except ValueError as exc:
         _handle_service_error(exc)
 
@@ -39,10 +57,12 @@ def get_map(
     site: Optional[str] = None,
     year: Optional[int] = None,
     month: Optional[int] = None,
+    months: Optional[str] = None,
 ):
     try:
         return MapStatsResponse(**analytics.get_map_stats(
-            chip=chip, province=province, city=city, site=site, year=year, month=month,
+            chip=chip, province=province, city=city, site=site,
+            year=year, month=month, months=months,
         ))
     except ValueError as exc:
         _handle_service_error(exc)
@@ -56,10 +76,12 @@ def get_alerts(
     site: Optional[str] = None,
     year: Optional[int] = None,
     month: Optional[int] = None,
+    months: Optional[str] = None,
 ):
     try:
         return analytics.get_alerts(
-            chip=chip, province=province, city=city, site=site, year=year, month=month,
+            chip=chip, province=province, city=city, site=site,
+            year=year, month=month, months=months,
         )
     except ValueError as exc:
         _handle_service_error(exc)

@@ -11,6 +11,7 @@ export interface MapStats {
   map_provinces: string[]
   display_year: number | null
   display_month: number | null
+  display_months: number[]
   overall: {
     ratio: number
     fault_count: number

@@ -16,10 +16,12 @@ def code_bar(
     site: Optional[str] = None,
     year: Optional[int] = None,
     month: Optional[int] = None,
+    months: Optional[str] = None,
 ):
     try:
         return analytics.get_code_bar_chart(
-            chip=chip, province=province, city=city, site=site, year=year, month=month,
+            chip=chip, province=province, city=city, site=site,
+            year=year, month=month, months=months,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -75,6 +75,7 @@ def _empty_map_stats() -> Dict[str, Any]:
         'map_provinces': [],
         'display_year': None,
         'display_month': None,
+        'display_months': [],
         'overall': {'ratio': 0.0, 'fault_count': 0, 'total_count': 0},
     }
 
@@ -111,19 +112,100 @@ def analyze_folder(folder_path: str, extract_zip: bool = False) -> Dict[str, Any
     }
 
 
-def get_filter_options(chip: Optional[str] = None) -> Dict[str, Any]:
+def get_filter_options(
+    chip: Optional[str] = None,
+    province: Optional[str] = None,
+    city: Optional[str] = None,
+    site: Optional[str] = None,
+    years: Optional[str] = None,
+    months: Optional[str] = None,
+) -> Dict[str, Any]:
+    """按当前已选维度联动计算各下拉可选项（计算某一维时排除该维自身条件）。"""
     all_records = require_board_records()
-    filtered = _filter_records(chips=chip)
-    options = _processor.get_filter_options(filtered)
+    chips = _parse_list(chip)
+    provinces = _parse_list(province)
+    cities = _parse_list(city)
+    sites = _parse_list(site)
+    year_list = _parse_int_list(years)
+    month_list = _parse_int_list(months)
+
+    def _facet(*exclude: str) -> List[Dict[str, Any]]:
+        kw: Dict[str, Any] = {}
+        if "chips" not in exclude:
+            kw["chips"] = chips
+        if "provinces" not in exclude:
+            kw["provinces"] = provinces
+        if "cities" not in exclude:
+            kw["cities"] = cities
+        if "site_names" not in exclude:
+            kw["site_names"] = sites
+        if "years" not in exclude:
+            kw["years"] = year_list
+        if "months" not in exclude:
+            kw["months"] = month_list
+        return _processor._filter_board_records(all_records, **kw)
+
+    chip_opts = _processor.get_filter_options(_facet("chips"))
+    site_opts = _processor.get_filter_options(_facet("site_names"))
+    province_opts = _processor.get_filter_options(_facet("provinces"))
+    city_opts = _processor.get_filter_options(_facet("cities"))
+    year_opts = _processor.get_filter_options(_facet("years"))
+    month_opts = _processor.get_filter_options(_facet("months"))
     all_options = _processor.get_filter_options(all_records)
-    options["chips"] = all_options["chips"]
-    options["years"] = all_options["years"]
-    options["year_month_map"] = all_options["year_month_map"]
-    options["site_names"] = all_options["site_names"]
-    options["latest_year"] = all_options.get("latest_year")
-    options["latest_month"] = all_options.get("latest_month")
-    options["folder_path"] = _last_folder
+
+    options = {
+        "chips": chip_opts["chips"],
+        "site_names": site_opts["site_names"],
+        "provinces": province_opts["provinces"],
+        "city_map": city_opts["city_map"],
+        "standalone_cities": city_opts["standalone_cities"],
+        "years": year_opts["years"],
+        "year_month_map": month_opts["year_month_map"],
+        "latest_year": all_options.get("latest_year"),
+        "latest_month": all_options.get("latest_month"),
+        "folder_path": _last_folder,
+    }
+    # #region agent log
+    try:
+        import json as _json
+        with open(DEBUG_SESSION_LOG_PATH, "a", encoding="utf-8") as _df:
+            _df.write(_json.dumps({
+                "sessionId": "c939a3",
+                "runId": "post-fix",
+                "hypothesisId": "H1-H2-H4",
+                "location": "analytics.py:get_filter_options",
+                "message": "cascading filter options computed",
+                "data": {
+                    "params": {
+                        "chip": chip, "province": province, "city": city,
+                        "site": site, "years": years, "months": months,
+                    },
+                    "all_record_count": len(all_records),
+                    "returned_chips": len(options["chips"]),
+                    "returned_sites": len(options["site_names"]),
+                    "returned_provinces": options["provinces"],
+                    "returned_years": options["years"],
+                    "returned_year_month_map": options["year_month_map"],
+                    "overwrote_from_all": False,
+                },
+                "timestamp": int(__import__("time").time() * 1000),
+            }, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    # #endregion
     return options
+
+
+def _resolve_month_list(
+    month: Optional[int] = None,
+    months: Optional[str] = None,
+) -> Optional[List[int]]:
+    month_list = _parse_int_list(months)
+    if month_list:
+        return month_list
+    if month is not None:
+        return [month]
+    return None
 
 
 def get_map_stats(
@@ -133,27 +215,49 @@ def get_map_stats(
     site: Optional[str] = None,
     year: Optional[int] = None,
     month: Optional[int] = None,
+    months: Optional[str] = None,
 ) -> Dict[str, Any]:
-    if year is None or month is None:
+    month_list = _resolve_month_list(month=month, months=months)
+    if year is None or not month_list:
         return _empty_map_stats()
 
     records = _filter_records(chips=chip, provinces=province, cities=city, site=site)
-    records = _processor._filter_board_records(records, year=year, month=month)
+    records = _processor._filter_board_records(records, year=year, months=month_list)
+    raw_count = len(records)
+    dedupe_by_sn = len(month_list) > 1
     result = _processor.get_vulcanization_map_stats(
         records,
         provinces=_parse_list(province),
         cities=_parse_list(city),
+        dedupe_by_sn=dedupe_by_sn,
     )
     result['display_year'] = year
-    result['display_month'] = month
+    result['display_month'] = month_list[0] if len(month_list) == 1 else None
+    result['display_months'] = month_list
     # #region agent log
     try:
         import json as _json
         with open(AGENT_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
-            _df.write(_json.dumps({"sessionId": "a5fec5", "hypothesisId": "H1", "location": "analytics.py:get_map_stats", "message": "map stats ratios", "data": {"year": year, "month": month, "overall": result.get("overall"), "items": result.get("items", [])[:5], "record_count": len(records)}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
-        unique_slots = len({(r.get("文件路径"), r.get("匹配值"), r.get("年份"), r.get("月份")) for r in records if str(r.get("匹配值", "")).strip()})
+            _df.write(_json.dumps({"sessionId": "a5fec5", "hypothesisId": "H1", "location": "analytics.py:get_map_stats", "message": "map stats ratios", "data": {"year": year, "month": month, "months": month_list, "overall": result.get("overall"), "items": result.get("items", [])[:5], "record_count": len(records)}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
         with open(DEBUG_SESSION_LOG_PATH, "a", encoding="utf-8") as _df:
-            _df.write(_json.dumps({"sessionId": "c939a3", "runId": "post-fix", "hypothesisId": "H3", "location": "analytics.py:get_map_stats", "message": "total_count vs regex slot count", "data": {"year": year, "month": month, "displayed_total_count": result.get("overall", {}).get("total_count"), "filtered_record_count": len(records), "unique_regex_slots": unique_slots}, "timestamp": int(__import__("time").time() * 1000)}, ensure_ascii=False) + "\n")
+            _df.write(_json.dumps({
+                "sessionId": "c939a3",
+                "runId": "post-fix",
+                "hypothesisId": "H3-H4",
+                "location": "analytics.py:get_map_stats",
+                "message": "map multi-month sn dedupe",
+                "data": {
+                    "year": year,
+                    "months": month_list,
+                    "dedupe_by_sn": dedupe_by_sn,
+                    "raw_record_count": raw_count,
+                    "stat_record_count": result.get("overall", {}).get("total_count"),
+                    "displayed_total_count": result.get("overall", {}).get("total_count"),
+                    "displayed_fault_count": result.get("overall", {}).get("fault_count"),
+                    "items": result.get("items", [])[:5],
+                },
+                "timestamp": int(__import__("time").time() * 1000),
+            }, ensure_ascii=False) + "\n")
     except OSError:
         pass
     # #endregion
@@ -167,13 +271,15 @@ def get_alerts(
     site: Optional[str] = None,
     year: Optional[int] = None,
     month: Optional[int] = None,
+    months: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    if year is None or month is None:
+    month_list = _resolve_month_list(month=month, months=months)
+    if year is None or not month_list:
         return []
 
     records = _filter_records(chips=chip, provinces=province, cities=city, site=site)
-    records = _processor._filter_board_records(records, year=year, month=month)
-    return _processor.get_alerts(records)
+    records = _processor._filter_board_records(records, year=year, months=month_list)
+    return _processor.get_alerts(records, dedupe_by_sn=len(month_list) > 1)
 
 
 def get_code_bar_chart(
@@ -183,8 +289,10 @@ def get_code_bar_chart(
     site: Optional[str] = None,
     year: Optional[int] = None,
     month: Optional[int] = None,
+    months: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    if year is None or month is None:
+    month_list = _resolve_month_list(month=month, months=months)
+    if year is None or not month_list:
         return []
 
     records = require_board_records()
@@ -195,7 +303,8 @@ def get_code_bar_chart(
         cities=_parse_list(city),
         site_names=_parse_list(site),
         year=year,
-        month=month,
+        months=month_list,
+        dedupe_by_sn=len(month_list) > 1,
     )
 
 

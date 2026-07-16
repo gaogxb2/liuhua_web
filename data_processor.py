@@ -1853,54 +1853,90 @@ class DataProcessor:
         fault = sum(1 for r in records if r.get('is_fault'))
         return {'total': total, 'fault': fault}
 
+    def _sn_key(self, record: Dict[str, Any]) -> str:
+        sn = str(record.get('条码2', '') or '').strip()
+        if sn:
+            return sn
+        return f"{record.get('文件路径', '')}|{record.get('匹配值', '')}"
+
+    def _count_by_sn(self, records: List[Dict[str, Any]]) -> Dict[str, int]:
+        """地区内按单板 sn 去重计数；任一记录硫化则该 sn 计为硫化。"""
+        by_sn: Dict[str, bool] = {}
+        for r in records:
+            key = self._sn_key(r)
+            by_sn[key] = by_sn.get(key, False) or bool(r.get('is_fault'))
+        return {
+            'total': len(by_sn),
+            'fault': sum(1 for fault in by_sn.values() if fault),
+        }
+
+    def _aggregate_records_by_sn(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """跨月汇总：同一单板 sn 只计一块；合并 codes，任一月份/槽位硫化则记为硫化。"""
+        groups: Dict[str, List[Dict[str, Any]]] = {}
+        for r in records:
+            groups.setdefault(self._sn_key(r), []).append(r)
+
+        merged: List[Dict[str, Any]] = []
+        for items in groups.values():
+            base = dict(items[0])
+            codes: List[int] = []
+            seen_codes: set = set()
+            is_fault = False
+            for it in items:
+                if it.get('is_fault'):
+                    is_fault = True
+                for code_val in it.get('codes', []):
+                    if code_val not in seen_codes:
+                        seen_codes.add(code_val)
+                        codes.append(code_val)
+            fault_codes = [c for c in codes if c < self.FAULT_CODE_THRESHOLD]
+            base['codes'] = codes
+            base['fault_codes'] = fault_codes
+            base['is_fault'] = is_fault or len(fault_codes) > 0
+            base['code_sum'] = sum(codes)
+            merged.append(base)
+        return merged
+
     def get_vulcanization_map_stats(
         self,
         board_records: List[Dict[str, Any]],
         provinces: Optional[List[str]] = None,
         cities: Optional[List[str]] = None,
+        dedupe_by_sn: bool = False,
     ) -> Dict[str, Any]:
         """返回省或市维度的故障比例数据，支持多省/多市筛选"""
         filtered = self._filter_board_records(board_records, provinces=provinces, cities=cities)
 
+        def _bump(regions: Dict[str, List[Dict[str, Any]]], name: str, record: Dict[str, Any]):
+            if not name:
+                return
+            regions.setdefault(name, []).append(record)
+
         if cities:
-            regions: Dict[str, Dict[str, int]] = {}
+            region_recs: Dict[str, List[Dict[str, Any]]] = {}
             for r in filtered:
-                name = r.get('城市', '')
-                if not name:
-                    continue
-                regions.setdefault(name, {'total': 0, 'fault': 0})
-                regions[name]['total'] += 1
-                if r.get('is_fault'):
-                    regions[name]['fault'] += 1
+                _bump(region_recs, r.get('城市', ''), r)
             level = 'city_focus'
             map_provinces = sorted({r.get('省份', '') for r in filtered if r.get('省份')})
         elif provinces:
-            regions = {}
+            region_recs = {}
             for r in filtered:
-                name = r.get('城市', '')
-                if not name:
-                    continue
-                regions.setdefault(name, {'total': 0, 'fault': 0})
-                regions[name]['total'] += 1
-                if r.get('is_fault'):
-                    regions[name]['fault'] += 1
+                _bump(region_recs, r.get('城市', ''), r)
             level = 'city'
             map_provinces = list(provinces)
         else:
-            regions = {}
+            region_recs = {}
             for r in filtered:
-                name = r.get('省份', '')
-                if not name:
-                    continue
-                regions.setdefault(name, {'total': 0, 'fault': 0})
-                regions[name]['total'] += 1
-                if r.get('is_fault'):
-                    regions[name]['fault'] += 1
+                _bump(region_recs, r.get('省份', ''), r)
             level = 'province'
             map_provinces = []
 
         items = []
-        for name, counts in sorted(regions.items()):
+        for name, recs in sorted(region_recs.items()):
+            counts = self._count_by_sn(recs) if dedupe_by_sn else {
+                'total': len(recs),
+                'fault': sum(1 for r in recs if r.get('is_fault')),
+            }
             total = counts['total']
             fault = counts['fault']
             ratio = round(fault / total * 100, 2) if total else 0.0
@@ -1911,7 +1947,13 @@ class DataProcessor:
                 'total_count': total,
             })
 
-        overall = self._calc_region_stats(filtered)
+        overall = self._count_by_sn(filtered) if dedupe_by_sn else self._calc_region_stats(filtered)
+        # 多地区时，overall 按「各地区 sn 去重后再相加」口径：与 items 合计一致
+        if dedupe_by_sn and items:
+            overall = {
+                'total': sum(i['total_count'] for i in items),
+                'fault': sum(i['fault_count'] for i in items),
+            }
         overall_ratio = round(overall['fault'] / overall['total'] * 100, 2) if overall['total'] else 0.0
 
         result = {
@@ -1984,6 +2026,7 @@ class DataProcessor:
         self,
         board_records: List[Dict[str, Any]],
         threshold: float = 0.05,
+        dedupe_by_sn: bool = False,
     ) -> List[Dict[str, Any]]:
         """硫化比例（code < 0x16）超过阈值时，按市生成预警"""
         city_groups: Dict[str, List[Dict[str, Any]]] = {}
@@ -1996,10 +2039,15 @@ class DataProcessor:
         alerts = []
         for key, recs in city_groups.items():
             p, c = key.split('|', 1)
-            total = len(recs)
+            if dedupe_by_sn:
+                counts = self._count_by_sn(recs)
+                total = counts['total']
+                fault = counts['fault']
+            else:
+                total = len(recs)
+                fault = sum(1 for r in recs if r.get('is_fault'))
             if total == 0:
                 continue
-            fault = sum(1 for r in recs if r.get('is_fault'))
             ratio = fault / total
             if ratio > threshold:
                 alerts.append({
@@ -2020,8 +2068,11 @@ class DataProcessor:
         cities: Optional[List[str]] = None,
         year: Optional[int] = None,
         month: Optional[int] = None,
+        years: Optional[List[int]] = None,
+        months: Optional[List[int]] = None,
         chips: Optional[List[str]] = None,
         site_names: Optional[List[str]] = None,
+        dedupe_by_sn: bool = False,
     ) -> List[Dict[str, Any]]:
         """柱状图：各 code 值对应的单板数量"""
         filtered = self._filter_board_records(
@@ -2030,9 +2081,13 @@ class DataProcessor:
             cities=cities,
             year=year,
             month=month,
+            years=years,
+            months=months,
             chips=chips,
             site_names=site_names,
         )
+        if dedupe_by_sn:
+            filtered = self._aggregate_records_by_sn(filtered)
         code_counts: Dict[int, int] = {}
         for r in filtered:
             codes = r.get('codes', [])

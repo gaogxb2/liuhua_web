@@ -81,16 +81,16 @@ export function useDashboard() {
   })
 
   const canShowDetail = computed(
-    () => filters.years.length === 1 && filters.months.length === 1,
+    () => filters.years.length === 1 && filters.months.length >= 1,
   )
 
   const detailHint = computed(() => {
     if (!analyzed.value) return ''
     if (filters.years.length === 0 || filters.months.length === 0) {
-      return '请选择单个年份和单个月份以查看地图、硫化预警与单板数量分布。'
+      return '请选择单个年份，并至少选择一个月份以查看地图、硫化预警与单板数量分布。'
     }
-    if (filters.years.length > 1 || filters.months.length > 1) {
-      return '地图、硫化预警与单板数量分布仅支持单年单月，请各保留一项。'
+    if (filters.years.length > 1) {
+      return '地图、硫化预警与单板数量分布仅支持单个年份（可多选月份），请只保留一年。'
     }
     return ''
   })
@@ -120,7 +120,37 @@ export function useDashboard() {
     filters.folderPath = await fetchDefaultFolder()
   }
 
-    async function refreshTrend() {
+  async function refreshFilterOptions() {
+    const options = await fetchFilters(
+      filters.chips,
+      filters.provinces,
+      filters.cities,
+      filters.siteNames,
+      filters.years,
+      filters.months,
+    )
+    filterOptions.value = {
+      ...filterOptions.value,
+      ...options,
+      site_names: options.site_names ?? [],
+    }
+    const validChips = new Set(filterOptions.value.chips)
+    filters.chips = filters.chips.filter((c) => validChips.has(c))
+    const validSites = new Set(filterOptions.value.site_names)
+    filters.siteNames = filters.siteNames.filter((s) => validSites.has(s))
+    const validProvinces = new Set(filterOptions.value.provinces)
+    filters.provinces = filters.provinces.filter((p) => validProvinces.has(p))
+    const validCities = new Set(cityOptions.value)
+    filters.cities = filters.cities.filter((c) => validCities.has(c))
+    const validYears = new Set(filterOptions.value.years)
+    filters.years = filters.years.filter((y) => validYears.has(y))
+    syncMonthsAfterYearChange()
+    // #region agent log
+    fetch('http://127.0.0.1:7294/ingest/d453560c-d6b4-4b8f-badc-3989933f19f1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c939a3'},body:JSON.stringify({sessionId:'c939a3',runId:'post-fix',hypothesisId:'H3-H5',location:'useDashboard.ts:refreshFilterOptions',message:'cascading options refreshed',data:{chips:filters.chips,sites:filters.siteNames,provinces:filters.provinces,years:filters.years,months:filters.months,optChips:options.chips?.length,optSites:options.site_names?.length,optProvinces:options.provinces,optYears:options.years,optMonthsMap:options.year_month_map},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }
+
+  async function refreshTrend() {
     if (!analyzed.value || !canShowTrend.value) {
       trendSeries.value = []
       return
@@ -141,6 +171,10 @@ export function useDashboard() {
 
     await refreshTrend()
 
+    // #region agent log
+    fetch('http://127.0.0.1:7294/ingest/d453560c-d6b4-4b8f-badc-3989933f19f1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c939a3'},body:JSON.stringify({sessionId:'c939a3',runId:'pre-fix',hypothesisId:'H1-H2',location:'useDashboard.ts:refreshCharts',message:'detail gate before map/alerts/bar',data:{canShowDetail:canShowDetail.value,years:filters.years,months:filters.months,yearsLen:filters.years.length,monthsLen:filters.months.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
     if (!canShowDetail.value) {
       mapStats.value = null
       alerts.value = []
@@ -151,18 +185,18 @@ export function useDashboard() {
 
     const { chips, provinces, cities, siteNames } = filters
     const year = filters.years[0]
-    const month = filters.months[0]
+    const months = [...filters.months].sort((a, b) => a - b)
     const [map, alertList, bar] = await Promise.all([
-      fetchMap(chips, provinces, cities, siteNames, year, month),
-      fetchAlerts(chips, provinces, cities, siteNames, year, month),
-      fetchCodeBar(chips, provinces, cities, siteNames, year, month),
+      fetchMap(chips, provinces, cities, siteNames, year, months),
+      fetchAlerts(chips, provinces, cities, siteNames, year, months),
+      fetchCodeBar(chips, provinces, cities, siteNames, year, months),
     ])
     mapStats.value = map
     alerts.value = alertList
     codeBarData.value = bar
     totalBoards.value = map.overall.total_count
     // #region agent log
-    fetch('http://127.0.0.1:7294/ingest/d453560c-d6b4-4b8f-badc-3989933f19f1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c939a3'},body:JSON.stringify({sessionId:'c939a3',hypothesisId:'H4',location:'useDashboard.ts:refreshCharts',message:'frontend totalBoards from map',data:{totalBoards:map.overall.total_count,year,month,chips,provinces,cities,siteNames},timestamp:Date.now()})}).catch(()=>{});
+    fetch('http://127.0.0.1:7294/ingest/d453560c-d6b4-4b8f-badc-3989933f19f1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c939a3'},body:JSON.stringify({sessionId:'c939a3',runId:'post-fix',hypothesisId:'H1-H4',location:'useDashboard.ts:refreshCharts',message:'frontend totalBoards from map',data:{totalBoards:map.overall.total_count,year,months,fault:map.overall.fault_count,chips,provinces,cities,siteNames},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
   }
 
@@ -183,10 +217,13 @@ export function useDashboard() {
       filters.siteNames = []
       filters.years = result.filters.latest_year != null ? [result.filters.latest_year] : []
       filters.months = result.filters.latest_month != null ? [result.filters.latest_month] : []
+      // 默认最近年月后，按年月收窄其余下拉可选项
+      await refreshFilterOptions()
       await refreshCharts()
       const y = filters.years[0]
-      const m = filters.months[0]
-      statusText.value = `分析完成，共 ${totalBoards.value} 块单板（${y}年${m}月）`
+      const ms = [...filters.months].sort((a, b) => a - b)
+      const monthLabel = ms.length === 1 ? `${ms[0]}月` : ms.map((m) => `${m}月`).join('、')
+      statusText.value = `分析完成，共 ${totalBoards.value} 块单板（${y}年${monthLabel}）`
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         statusText.value = String(err.response?.data?.detail || '分析失败')
@@ -204,29 +241,20 @@ export function useDashboard() {
   async function onFilterChange() {
     if (!analyzed.value) return
     limitTrendChips()
-    const options = await fetchFilters(filters.chips)
-    filterOptions.value = {
-      ...filterOptions.value,
-      ...options,
-      site_names: options.site_names?.length ? options.site_names : filterOptions.value.site_names,
-    }
-    const validCities = new Set(cityOptions.value)
-    filters.cities = filters.cities.filter((c) => validCities.has(c))
-    const validProvinces = new Set(filterOptions.value.provinces)
-    filters.provinces = filters.provinces.filter((p) => validProvinces.has(p))
-    syncMonthsAfterYearChange()
+    await refreshFilterOptions()
     await refreshCharts()
   }
 
-  function onYearMonthChange() {
-    syncMonthsAfterYearChange()
-    refreshCharts()
+  async function onYearMonthChange() {
+    if (!analyzed.value) return
+    await refreshFilterOptions()
+    await refreshCharts()
   }
 
   function resetRegionFilters() {
     filters.provinces = []
     filters.cities = []
-    refreshCharts()
+    onFilterChange()
   }
 
   function toggleProvince(province: string) {
